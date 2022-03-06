@@ -10,6 +10,7 @@ backports.functools-lru-cache==1.6.4
 black==22.1.0
 bleach==4.1.0
 brotlipy==0.7.0
+cached-property==1.5.2
 certifi==2021.10.8
 cffi==1.15.0
 charset-normalizer==2.0.12
@@ -22,6 +23,7 @@ defusedxml==0.7.1
 entrypoints==0.4
 executing==0.8.3
 flit_core==3.7.1
+h5py==3.6.0
 idna==3.3
 importlib-metadata==4.11.2
 importlib-resources==5.4.0
@@ -72,6 +74,7 @@ python-dateutil==2.8.2
 pytz==2021.3
 pyzmq==22.3.0
 requests==2.27.1
+scipy==1.8.0
 Send2Trash==1.8.0
 setuptools==60.9.3
 six==1.16.0
