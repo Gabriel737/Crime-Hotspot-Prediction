@@ -10,3 +10,4 @@ This project aims to identify areas and neighbouthoods with elevated crime risk 
 * Secondary data source for extended insights eg. vehicular traffic, network traffic etc.
 
 ## Pipeline
+![pipeline](https://user-images.githubusercontent.com/63226332/157356389-2adfaec3-56b9-461b-9440-e9c8673f957f.jpeg)
