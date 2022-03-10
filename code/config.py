@@ -1,5 +1,9 @@
 ## Vancouver crime data config file
 
+VAN_DATA_RAW = '../data/raw'
+VAN_DATA_PRCD = '../data/processed'
+VAN_DATA_SHP = '../data/shape_files'
+
 # Vancouver UTM zone number and letter
 UTM_ZONE_NO = 10
 UTM_ZONE_LTR = 'U'
