@@ -191,21 +191,22 @@ def getPivot(data, values, index, columns, aggfunc, n_bins, allcombs=False):
         return data_pivot
 
 
-def getFeaturesTargets(data, batch_size):
+def getFeaturesTargets(data, seq_len):
     """
     Function to group instances to pairs of batch size and collect the corresponding target sample
 
     Inputs: data <DataFrame>: input data
-            batch_size <int>: number of instances to be grouped together
+            seq_len <int>: number of instances to be considered as a sequence
 
     Output: features <array>, targets <array>
     """
 
     features = []
     targets = []
-    for i in np.arange(0,data.shape[0]-(batch_size+1)):
-        feature_batch = data[i:i+batch_size]
-        target = data[i+batch_size+1]
+    for i in np.arange(0,data.shape[0]-(seq_len+1)):
+        feature_batch = data[i:i+seq_len]
+        target = data[i+seq_len+1]
         features.append(feature_batch)
         targets.append(target)
+    targets = np.array(targets).sum(axis=1)
     return features, targets
