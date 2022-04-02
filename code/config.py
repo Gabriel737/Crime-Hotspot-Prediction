@@ -1,5 +1,10 @@
 ## Vancouver crime data config file
 
+VAN_DATA_RAW = '../data/raw'
+VAN_DATA_PRCD = '../data/processed'
+VAN_DATA_SHP = '../data/shape_files'
+MODEL_SAVE_PATH = '../data/model_states'
+
 # Vancouver UTM zone number and letter
 UTM_ZONE_NO = 10
 UTM_ZONE_LTR = 'U'
@@ -39,8 +44,44 @@ BB_DIST = 13
 # Bounding box cell length (in kms)
 BB_CELL_LEN = 0.5
 
+# Number of cells along an axis 
+CELL_COUNT = 26
+
+# Number of cells in each dimension
+NUM_CELLS = BB_DIST * BB_CELL_LEN
+
 # Size of input batch to constitute a single temporal training sample
-BATCH_SIZE = 16
+SEQ_LEN = 16
+
+# Torch device
+DEVICE = 'cuda'
+
+# Train batch size
+TRAIN_BATCH_SIZE = 32
+
+# Dropout probability
+drop_p = 0.5
+
+# Learning rate
+LR = 0.001
+
+# Save Model
+SAVE = True
+
+# No. of epochs
+N_EPOCHS = 100
+
+# Classification threshold
+CLASS_THRESH = 0.4
+
+# Random seed
+RANDOM_SEED = 42
+
+# Optimiser 
+OPTIM_NAME = 'Adam'
+
+# Evaluate thresholds 
+EVAL_THRESHOLDS = [0.3, 0.4, 0.5 ,0.6, 0.7, 0.8]
 
 
 
