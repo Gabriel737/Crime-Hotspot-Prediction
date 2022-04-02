@@ -44,6 +44,9 @@ BB_DIST = 13
 # Bounding box cell length (in kms)
 BB_CELL_LEN = 0.5
 
+# Number of cells along an axis 
+CELL_COUNT = 26
+
 # Number of cells in each dimension
 NUM_CELLS = BB_DIST * BB_CELL_LEN
 
@@ -51,13 +54,13 @@ NUM_CELLS = BB_DIST * BB_CELL_LEN
 SEQ_LEN = 16
 
 # Torch device
-DEVICE = 'cpu'
+DEVICE = 'cuda'
 
 # Train batch size
 TRAIN_BATCH_SIZE = 32
 
 # Dropout probability
-drop_p = 0.4
+drop_p = 0.5
 
 # Learning rate
 LR = 0.001
@@ -66,14 +69,19 @@ LR = 0.001
 SAVE = True
 
 # No. of epochs
-N_EPOCHS = 1
+N_EPOCHS = 100
 
 # Classification threshold
-CLASS_THRESH = 0.5
+CLASS_THRESH = 0.4
 
 # Random seed
 RANDOM_SEED = 42
 
+# Optimiser 
+OPTIM_NAME = 'Adam'
+
+# Evaluate thresholds 
+EVAL_THRESHOLDS = [0.3, 0.4, 0.5 ,0.6, 0.7, 0.8]
 
 
 

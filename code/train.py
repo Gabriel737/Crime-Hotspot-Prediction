@@ -1,6 +1,6 @@
 from tqdm import tqdm
 import numpy as np
-from sklearn.metrics import recall_score
+from sklearn.metrics import recall_score, precision_score
 from pathlib import Path
 import time
 
@@ -11,9 +11,9 @@ from tensorboardX import SummaryWriter
 from data_loader import FeatureDataset
 import config
 from model import CNNLSTM
-from loss import classification_loss, regression_loss, total_loss
+from loss import classification_loss
 
-def validate(dl, model, batch_size, epoch ,best_recall, best_model):
+def validate(dl, model, batch_size, epoch ,best_recall, best_model, writer):
     '''
     The validation loop
     '''
@@ -23,6 +23,7 @@ def validate(dl, model, batch_size, epoch ,best_recall, best_model):
     epoch_loss = 0.0
     total = 0
     all_outputs = list()
+    all_outputs_probs = list()
     all_targets = list()
 
     for X, y_reg, y_bin in tqdm(dl):
@@ -30,18 +31,23 @@ def validate(dl, model, batch_size, epoch ,best_recall, best_model):
 
             pred_scores, pred_reg = model(X)
             bce_loss = classification_loss(pred_scores, y_bin)
-            mse_loss = regression_loss(pred_reg, y_reg)
-            loss = total_loss(bce_loss,mse_loss, task_num=2)
+            # mse_loss = regression_loss(pred_reg, y_reg)
+            # loss = total_loss(bce_loss,mse_loss, task_num=2)
 
             pred_bin = (pred_scores > config.CLASS_THRESH).float()
             all_outputs.append(pred_bin.view(-1,1).detach().cpu().numpy())
             all_targets.append(y_bin.view(-1,1).detach().cpu().numpy())
+            all_outputs_probs.append(pred_scores.view(-1,1).detach().cpu().numpy())
             total += y_reg.shape[0]
-            epoch_loss += loss.item()
+            epoch_loss += bce_loss.item()
         
     all_outputs = np.concatenate(all_outputs)
     all_targets = np.concatenate(all_targets)
-    recall = recall_score(all_outputs,all_targets)
+    all_outputs_probs = np.concatenate(all_outputs_probs)
+    recall = recall_score(y_pred=all_outputs,y_true=all_targets)
+    precision = precision_score(y_pred=all_outputs,y_true=all_targets)
+    writer.add_pr_curve('pr_curve', all_targets, all_outputs_probs, global_step=0)
+    writer.close()
 
     if epoch == 0:
         best_model = model
@@ -54,6 +60,7 @@ def validate(dl, model, batch_size, epoch ,best_recall, best_model):
     avg_loss = epoch_loss/total
 
     print(f'Validation Recall Score: {recall}')
+    print(f'Validation Precision Score: {precision}')
 
     return best_model, best_recall, recall, avg_loss
 
@@ -75,22 +82,24 @@ def test(dl, model, batch_size):
 
             pred_scores, pred_reg = model(X)
             bce_loss = classification_loss(pred_scores, y_bin)
-            mse_loss = regression_loss(pred_reg, y_reg)
-            loss = total_loss(bce_loss,mse_loss, task_num=2)
+            # mse_loss = regression_loss(pred_reg, y_reg)
+            # loss = total_loss(bce_loss,mse_loss, task_num=2)
 
-            pred_bin = (pred_scores > 0.5).float()
+            pred_bin = (pred_scores > config.CLASS_THRESH).float()
             all_outputs.append(pred_bin.view(-1,1).detach().cpu().numpy())
             all_targets.append(y_bin.view(-1,1).detach().cpu().numpy())
             total += y_reg.shape[0]
-            epoch_loss += loss.item()
+            epoch_loss += bce_loss.item()
         
     all_outputs = np.concatenate(all_outputs)
     all_targets = np.concatenate(all_targets)
-    recall = recall_score(all_outputs,all_targets)
+    recall = recall_score(y_pred=all_outputs,y_true=all_targets)
+    precision = precision_score(y_pred=all_outputs,y_true=all_targets)
 
     avg_loss = epoch_loss/total
 
     print(f'Test Recall Score: {recall}')
+    print(f'Test Precision Score: {precision}')
     print(f'Test Loss: {avg_loss}')
 
     return recall, avg_loss
@@ -118,32 +127,34 @@ def train(train_dl, val_dl, model, optim, epochs, batch_size, save, start_epoch=
 
                 pred_scores, pred_reg = model(X)
                 bce_loss = classification_loss(pred_scores, y_bin)
-                mse_loss = regression_loss(pred_reg, y_reg)
-                loss = total_loss(bce_loss,mse_loss,task_num=2)
+                # mse_loss = regression_loss(pred_reg, y_reg)
+                # loss = total_loss(bce_loss,mse_loss,task_num=2)
 
                 optim.zero_grad()
-                loss.backward()
+                bce_loss.backward()
                 optim.step()
-                pred_bin = (pred_scores > 0.5).float() 
+                pred_bin = (pred_scores > config.CLASS_THRESH).float() 
                 all_outputs.append(pred_bin.view(-1,1).detach().cpu().numpy())
                 all_targets.append(y_bin.view(-1,1).detach().cpu().numpy())
                 total += y_reg.shape[0]
-                epoch_loss += loss.item()
+                epoch_loss += bce_loss.item()
 
         all_outputs = np.concatenate(all_outputs)
         all_targets = np.concatenate(all_targets)
-        recall = recall_score(all_outputs,all_targets)
+        recall = recall_score(y_pred=all_outputs,y_true=all_targets)
+        precision = precision_score(y_pred=all_outputs,y_true=all_targets)
         avg_loss = epoch_loss/total
 
         print(f'Train Recall Score: {recall}')
+        print(f'Train Precision Score: {precision}')
         print(f'Train Loss: {avg_loss}')
 
-        best_model, best_val_recall, val_recall, val_avg_loss = validate(val_dl, model, batch_size, epoch, best_val_recall, best_model)
+        best_model, best_val_recall, val_recall, val_avg_loss = validate(val_dl, model, batch_size, epoch, best_val_recall, best_model, writer)
 
         writer.add_scalar('Loss/Train', avg_loss, epoch)
         writer.add_scalar('Loss/Val', val_avg_loss, epoch)
-        writer.add_scalar('F1 Score/Train', recall, epoch)
-        writer.add_scalar('F1 Score/Test', val_recall, epoch)
+        writer.add_scalar('Recall Score/Train', recall, epoch)
+        writer.add_scalar('Recall Score/Val', val_recall, epoch)
 
         if save:
             print('Saving model')
@@ -152,7 +163,7 @@ def train(train_dl, val_dl, model, optim, epochs, batch_size, save, start_epoch=
                 'optim': optim.state_dict,
                 'epoch': epoch     
             }
-            torch.save(checkpoint,model_save_path+'/model_checkpoint_{optim_name}_{config.LR}_{config.TRAIN_BATCH_SIZE}_{config.RANDOM_SEED}.pt')
+            torch.save(checkpoint,model_save_path+f'/model_checkpoint_{optim_name}_{config.LR}_{config.TRAIN_BATCH_SIZE}_{config.CLASS_THRESH}_{config.RANDOM_SEED}.pt')
     writer.close()
     return best_model, best_val_recall
 
@@ -193,7 +204,7 @@ if __name__ == '__main__':
     optim_name = type(optim).__name__
 
     try:
-        checkpoint = torch.load(model_save_path+f'/model_checkpoint_{optim_name}_{config.LR}_{config.TRAIN_BATCH_SIZE}_{config.RANDOM_SEED}.pt')
+        checkpoint = torch.load(model_save_path+f'/model_checkpoint_{optim_name}_{config.LR}_{config.TRAIN_BATCH_SIZE}_{config.CLASS_THRESH}_{config.RANDOM_SEED}.pt')
         model.load_state_dict(checkpoint['model'])
         print('\n Model Loaded \n')
         start_epoch = checkpoint['epoch'] + 1

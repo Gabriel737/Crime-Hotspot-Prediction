@@ -17,7 +17,7 @@ class CNNLSTM(nn.Module):
     and number of crimes in a cell
     '''
 
-    def __init__(self, n_input_channels, embed_size, batch_size):
+    def __init__(self, n_input_channels, embed_size, batch_size, device):
         '''
         Intialise class variables
 
@@ -50,9 +50,9 @@ class CNNLSTM(nn.Module):
         self.batch_norm12 = nn.BatchNorm2d(32)
         self.batch_norm3 = nn.BatchNorm2d(64)
 
-        (self.h1, self.c1) =  (torch.zeros(1, batch_size, 800).float(), torch.zeros(1, batch_size, 800).float())
-        (self.h2, self.c2) =  (torch.zeros(1, batch_size, 800).float(), torch.zeros(1, batch_size, 800).float())
-        (self.h3, self.c3) =  (torch.zeros(1, batch_size, 676).float(), torch.zeros(1, batch_size, 676).float())
+        (self.h1, self.c1) =  (torch.zeros(1, batch_size, 800, device=device).float(), torch.zeros(1, batch_size, 800, device=device).float())
+        (self.h2, self.c2) =  (torch.zeros(1, batch_size, 800, device=device).float(), torch.zeros(1, batch_size, 800, device=device).float())
+        (self.h3, self.c3) =  (torch.zeros(1, batch_size, 676, device=device).float(), torch.zeros(1, batch_size, 676, device=device).float())
 
         self.lstm1 = nn.LSTM(input_size=embed_size, hidden_size=800, 
                               num_layers=1)
@@ -61,8 +61,39 @@ class CNNLSTM(nn.Module):
         self.lstm3 = nn.LSTM(input_size=800, hidden_size=676,
                              num_layers=1)
 
-        # self.fc1 = nn.Linear(in_features=676,out_features=676)
-        # self.fc2 = nn.Linear(in_features=676,out_features=676)
+        self.fc1 = nn.Linear(in_features=676,out_features=676)
+        self.fc2 = nn.Linear(in_features=676,out_features=676)
+
+        nn.init.xavier_normal_(self.conv1_1.weight)
+        nn.init.xavier_normal_(self.conv1_2.weight)
+        nn.init.xavier_normal_(self.conv2_1.weight)
+        nn.init.xavier_normal_(self.conv2_2.weight)
+        nn.init.xavier_normal_(self.conv3_1.weight)
+        nn.init.xavier_normal_(self.conv3_2.weight)
+        nn.init.xavier_normal_(self.conv4_1.weight)
+        nn.init.xavier_normal_(self.conv4_2.weight)
+        nn.init.xavier_normal_(self.conv5.weight)
+        
+        for name, param in self.lstm1.named_parameters():
+            if 'bias' in name:
+                nn.init.constant_(param, 0.0)
+            elif 'weight' in name:
+                nn.init.xavier_normal_(param)
+        
+        for name, param in self.lstm2.named_parameters():
+            if 'bias' in name:
+                nn.init.constant_(param, 0.0)
+            elif 'weight' in name:
+                nn.init.xavier_normal_(param)
+        
+        for name, param in self.lstm3.named_parameters():
+            if 'bias' in name:
+                nn.init.constant_(param, 0.0)
+            elif 'weight' in name:
+                nn.init.xavier_normal_(param)
+
+        nn.init.xavier_normal_(self.fc1.weight)
+        nn.init.xavier_normal_(self.fc2.weight)
     
     def forward(self, x):
         x = x.view(16*32,
@@ -91,9 +122,8 @@ class CNNLSTM(nn.Module):
         x,(h2,_) = self.lstm2(x, (self.h2, self.c2))
         x,(h3, _) = self.lstm3(x, (self.h3, self.c3))
         x = x.squeeze()[-1,:,:]
-        # x1 = self.sigmoid(self.fc1(x))
-        x1 = self.sigmoid(x)
-        x2 = self.sigmoid(x)
+        x1 = self.sigmoid(self.fc1(x))
+        x2 = self.sigmoid(self.fc2(x))
         return x1, x2
     
 if __name__ == '__main__':

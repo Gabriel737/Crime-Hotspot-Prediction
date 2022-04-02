@@ -5,6 +5,7 @@ import utm
 import random
 import geopandas as gpd
 from datetime import datetime
+import matplotlib.pyplot as plt
 import config
 
 def generateRandomCoords(ngbh, geodata):
@@ -210,3 +211,17 @@ def getFeaturesTargets(data, seq_len):
         targets.append(target)
     targets = np.array(targets).sum(axis=1)
     return features, targets
+
+def plotConfusionMatrix(threshold_list, tp_list, fn_list, fn_neigh_pos_list, accuracy_list):
+
+    fig, ax1 = plt.subplots()
+
+    # plot bars in stack manner
+    ax1.bar(threshold_list,fn_list,bottom=np.array(fn_neigh_pos_list)+np.array(tp_list), color='red',label='True Positive vs False Negative(%)')
+    ax1.bar(threshold_list,fn_neigh_pos_list,bottom=tp_list, color='lightgreen')
+    ax1.bar(threshold_list,tp_list,color='g',label='Accuracy(%)')
+    ax2 = ax1.twinx()
+    ax2.plot(threshold_list,accuracy_list,color='black')
+
+    fig.savefig('../data/eval_plot.png')
+    plt.show()
