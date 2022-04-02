@@ -27,6 +27,8 @@ class CNNLSTM(nn.Module):
                  output_size <int> : number of predictions in output
         '''
         super(CNNLSTM, self).__init__()
+
+        self.device = device
         # CNN
         self.conv1_1 = nn.Conv2d(in_channels=n_input_channels, out_channels=32, kernel_size=3, padding=1)
         self.conv1_2 = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, padding=1)
@@ -50,9 +52,11 @@ class CNNLSTM(nn.Module):
         self.batch_norm12 = nn.BatchNorm2d(32)
         self.batch_norm3 = nn.BatchNorm2d(64)
 
-        (self.h1, self.c1) =  (torch.zeros(1, batch_size, 800, device=device).float(), torch.zeros(1, batch_size, 800, device=device).float())
-        (self.h2, self.c2) =  (torch.zeros(1, batch_size, 800, device=device).float(), torch.zeros(1, batch_size, 800, device=device).float())
-        (self.h3, self.c3) =  (torch.zeros(1, batch_size, 676, device=device).float(), torch.zeros(1, batch_size, 676, device=device).float())
+        self.hidden_dims = [800,800,676]
+
+        # (self.h1, self.c1) =  (torch.zeros(1, batch_size, 800, device=device).float(), torch.zeros(1, batch_size, 800, device=device).float())
+        # (self.h2, self.c2) =  (torch.zeros(1, batch_size, 800, device=device).float(), torch.zeros(1, batch_size, 800, device=device).float())
+        # (self.h3, self.c3) =  (torch.zeros(1, batch_size, 676, device=device).float(), torch.zeros(1, batch_size, 676, device=device).float())
 
         self.lstm1 = nn.LSTM(input_size=embed_size, hidden_size=800, 
                               num_layers=1)
@@ -96,7 +100,8 @@ class CNNLSTM(nn.Module):
         nn.init.xavier_normal_(self.fc2.weight)
     
     def forward(self, x):
-        x = x.view(16*32,
+        batch_size = len(x)
+        x = x.view(16*batch_size,
                    6,
                    26,26).float()
         x = self.relu(self.conv1_1(x))
@@ -117,14 +122,23 @@ class CNNLSTM(nn.Module):
         x = self.relu(self.conv4_1(x))
         x = self.relu(self.conv4_2(x))
         x = self.relu(self.conv5(x))
-        x = x.view(16,32,-1)
-        x,(h1,_) = self.lstm1(x, (self.h1, self.c1))
-        x,(h2,_) = self.lstm2(x, (self.h2, self.c2))
-        x,(h3, _) = self.lstm3(x, (self.h3, self.c3))
-        x = x.squeeze()[-1,:,:]
+        x = x.view(16,batch_size,-1)
+        h1, h2, h3, c1, c2, c3 = self.init_hidden(batch_size=batch_size, hidden_dims=self.hidden_dims, device=self.device)
+        x,(h1,_) = self.lstm1(x, (h1, c1))
+        x,(h2,_) = self.lstm2(x, (h2, c2))
+        x,(h3, _) = self.lstm3(x, (h3, c3))
+        print(x.shape)
+        # x = x.squeeze()[-1,:,:]
+        x = x[-1,:,:]
         x1 = self.sigmoid(self.fc1(x))
         x2 = self.sigmoid(self.fc2(x))
         return x1, x2
+    
+    def init_hidden(self, batch_size, hidden_dims, device):
+        (h1, c1) =  (torch.zeros(1, batch_size, hidden_dims[0], device=device).float(), torch.zeros(1, batch_size, hidden_dims[0], device=device).float())
+        (h2, c2) =  (torch.zeros(1, batch_size, hidden_dims[1], device=device).float(), torch.zeros(1, batch_size, hidden_dims[1], device=device).float())
+        (h3, c3) =  (torch.zeros(1, batch_size, hidden_dims[2], device=device).float(), torch.zeros(1, batch_size, hidden_dims[2], device=device).float())
+        return h1, h2, h3, c1, c2, c3
     
 if __name__ == '__main__':
 
