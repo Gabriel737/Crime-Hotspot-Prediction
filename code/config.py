@@ -59,11 +59,17 @@ DEVICE = 'cuda'
 # Train batch size
 TRAIN_BATCH_SIZE = 32
 
+# Number of filters in ConvLSTM
+HIDDEN_DIM = 64
+
+# Kernel size in ConvLSTM - CNN
+KERNEL_SIZE = 3
+
 # Dropout probability
-drop_p = 0.5
+DROP_P = 0.5
 
 # Learning rate
-LR = 0.001
+LR = 1e-5
 
 # Save Model
 SAVE = True

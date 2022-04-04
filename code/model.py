@@ -1,3 +1,4 @@
+from turtle import hideturtle
 import numpy as np
 
 import torch
@@ -6,145 +7,151 @@ import torch.nn.functional as F
 from torch.nn.modules import padding
 from pytorch_model_summary import summary
 
-
 import config
 
+class ConvLSTMCell(nn.Module):
 
-class CNNLSTM(nn.Module):
-    '''
-    Implementation of VGG-like CNN network followed by LSTM layers 
-    followed by two parallel FC layers to output likelihood of cell hotspot
-    and number of crimes in a cell
-    '''
+    def __init__(self, input_dim, hidden_dim, kernel_size, bias):
+        super(ConvLSTMCell,self).__init__()
 
-    def __init__(self, n_input_channels, embed_size, batch_size, device):
-        '''
-        Intialise class variables
+        self.input_dim = input_dim
+        self.hidden_dim = hidden_dim
+        self.kernel_size = kernel_size
+        self.bias = bias
+        self.padding = int((kernel_size - 1)/2)
 
-        Inputs : n_inpit_channels <int> : number of channels in input heatmaps
-                 embed_size <int> : LSTM input size 
-                 batch_size <int> : input batch size
-                 output_size <int> : number of predictions in output
-        '''
-        super(CNNLSTM, self).__init__()
+        self.conv = nn.Conv2d(in_channels=self.input_dim+self.hidden_dim,
+                              out_channels=4*self.hidden_dim,
+                              kernel_size=self.kernel_size,
+                              padding=self.padding,
+                              bias=self.bias)
+        
+    def forward(self, input, cur_state):
+        h_cur, c_cur = cur_state
 
-        self.device = device
-        # CNN
-        self.conv1_1 = nn.Conv2d(in_channels=n_input_channels, out_channels=32, kernel_size=3, padding=1)
-        self.conv1_2 = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, padding=1)
+        combined = torch.cat([input, h_cur], dim=1)
 
-        self.conv2_1 = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, padding=1)
-        self.conv2_2 = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, padding=1)
+        combined_conv = self.conv(combined)
+        cc_i, cc_f, cc_o, cc_g = torch.split(combined_conv, self.hidden_dim, dim=1)
+        i = torch.sigmoid(cc_i)
+        f = torch.sigmoid(cc_f)
+        o = torch.sigmoid(cc_o)
+        g = torch.tanh(cc_g)
 
-        self.conv3_1 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1)
-        self.conv3_2 = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, padding=1)
+        c_next = f*c_cur + i*g
+        h_next = o*torch.tanh(c_next)
 
-        self.conv4_1 = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, padding=1)
-        self.conv4_2 = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, padding=1)
+        return h_next, c_next
+    
+    def init_hidden(self, batch_size, img_size):
+        h, w = img_size
+        return (torch.zeros(batch_size, self.hidden_dim, h, w, device=self.conv.weight.device),
+                torch.zeros(batch_size, self.hidden_dim, h, w, device=self.conv.weight.device))
+    
 
-        self.conv5 = nn.Conv2d(in_channels=64, out_channels=256, kernel_size=1)
+class ConvLSTM(nn.Module):
 
-        self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2)
+    def __init__(self, input_dim, hidden_dim, kernel_size, bias=True):
+        super(ConvLSTM, self).__init__()
 
-        self.relu = nn.ReLU()
+        self.cell = ConvLSTMCell(input_dim=input_dim, hidden_dim=hidden_dim, kernel_size=kernel_size, bias=bias)
+
+    def forward(self, input, hidden_state=None):
+
+        b, seq_len, _, h, w = input.size()
+
+        hidden_state = self._init_hidden(batch_size=b, img_size=(h,w))
+        h,c = hidden_state
+        output_inner = list()
+        for t in range(seq_len):
+            h,c = self.cell(input=input[:,t,:,:,:], cur_state=[h,c])
+            output_inner.append(h)
+        output_inner = torch.stack((output_inner),dim=1)
+        layer_output = output_inner
+        last_state = [h,c]
+        return layer_output
+    
+    def _init_hidden(self, batch_size, img_size):
+        init_states = self.cell.init_hidden(batch_size=batch_size,img_size=img_size)
+        return init_states
+
+class HotspotPredictor(nn.Module):
+    
+    def __init__(self, input_dim, hidden_dim, kernel_size, bias=True):
+        super(HotspotPredictor, self).__init__()
+
+        self.convlstm1 = ConvLSTM(input_dim=input_dim, hidden_dim=hidden_dim, kernel_size=kernel_size, bias=bias)
+        self.batch_norm1 = nn.BatchNorm3d(num_features=hidden_dim)
+
+        self.convlstm2 = ConvLSTM(input_dim=hidden_dim, hidden_dim=hidden_dim, kernel_size=kernel_size, bias=bias)
+        self.batch_norm2 = nn.BatchNorm3d(num_features=hidden_dim)
+
+        self.convlstm3 = ConvLSTM(input_dim=hidden_dim, hidden_dim=hidden_dim, kernel_size=kernel_size, bias=bias)
+        self.batch_norm3 = nn.BatchNorm3d(num_features=hidden_dim)
+
+        self.convlstm4 = ConvLSTM(input_dim=hidden_dim, hidden_dim=hidden_dim, kernel_size=kernel_size, bias=bias)
+        self.batch_norm4 = nn.BatchNorm3d(num_features=hidden_dim)
+
+        self.maxpool = nn.MaxPool3d(kernel_size=1,stride=[2,1,1])
+        self.dropout = nn.Dropout(p=config.DROP_P)
         self.sigmoid = nn.Sigmoid()
-        self.dropout = nn.Dropout(p=config.drop_p)
-        self.batch_norm12 = nn.BatchNorm2d(32)
-        self.batch_norm3 = nn.BatchNorm2d(64)
 
-        self.hidden_dims = [800,800,676]
-
-        # (self.h1, self.c1) =  (torch.zeros(1, batch_size, 800, device=device).float(), torch.zeros(1, batch_size, 800, device=device).float())
-        # (self.h2, self.c2) =  (torch.zeros(1, batch_size, 800, device=device).float(), torch.zeros(1, batch_size, 800, device=device).float())
-        # (self.h3, self.c3) =  (torch.zeros(1, batch_size, 676, device=device).float(), torch.zeros(1, batch_size, 676, device=device).float())
-
-        self.lstm1 = nn.LSTM(input_size=embed_size, hidden_size=800, 
-                              num_layers=1)
-        self.lstm2 = nn.LSTM(input_size=800, hidden_size=800, 
-                              num_layers=1)
-        self.lstm3 = nn.LSTM(input_size=800, hidden_size=676,
-                             num_layers=1)
-
-        self.fc1 = nn.Linear(in_features=676,out_features=676)
-        self.fc2 = nn.Linear(in_features=676,out_features=676)
-
-        nn.init.xavier_normal_(self.conv1_1.weight)
-        nn.init.xavier_normal_(self.conv1_2.weight)
-        nn.init.xavier_normal_(self.conv2_1.weight)
-        nn.init.xavier_normal_(self.conv2_2.weight)
-        nn.init.xavier_normal_(self.conv3_1.weight)
-        nn.init.xavier_normal_(self.conv3_2.weight)
-        nn.init.xavier_normal_(self.conv4_1.weight)
-        nn.init.xavier_normal_(self.conv4_2.weight)
-        nn.init.xavier_normal_(self.conv5.weight)
-        
-        for name, param in self.lstm1.named_parameters():
-            if 'bias' in name:
-                nn.init.constant_(param, 0.0)
-            elif 'weight' in name:
-                nn.init.xavier_normal_(param)
-        
-        for name, param in self.lstm2.named_parameters():
-            if 'bias' in name:
-                nn.init.constant_(param, 0.0)
-            elif 'weight' in name:
-                nn.init.xavier_normal_(param)
-        
-        for name, param in self.lstm3.named_parameters():
-            if 'bias' in name:
-                nn.init.constant_(param, 0.0)
-            elif 'weight' in name:
-                nn.init.xavier_normal_(param)
-
-        nn.init.xavier_normal_(self.fc1.weight)
-        nn.init.xavier_normal_(self.fc2.weight)
+        self.conv3d = nn.Conv3d(in_channels=hidden_dim,out_channels=1,kernel_size=(1,3,3),padding=(0,1,1),bias=True)
     
-    def forward(self, x):
-        batch_size = len(x)
-        x = x.view(16*batch_size,
-                   6,
-                   26,26).float()
-        x = self.relu(self.conv1_1(x))
-        x = self.relu(self.conv1_2(x))
-        x = self.maxpool(x)
-        x = self.dropout(x)
-        x = self.batch_norm12(x)
-        x = self.relu(self.conv2_1(x))
-        x = self.relu(self.conv2_2(x))
-        x = self.maxpool(x)
-        x = self.dropout(x)
-        x = self.batch_norm12(x)
-        x = self.relu(self.conv3_1(x))
-        x = self.relu(self.conv3_2(x))
-        x = self.maxpool(x)
-        x = self.dropout(x)
-        x = self.batch_norm3(x)
-        x = self.relu(self.conv4_1(x))
-        x = self.relu(self.conv4_2(x))
-        x = self.relu(self.conv5(x))
-        x = x.view(16,batch_size,-1)
-        h1, h2, h3, c1, c2, c3 = self.init_hidden(batch_size=batch_size, hidden_dims=self.hidden_dims, device=self.device)
-        x,(h1,_) = self.lstm1(x, (h1, c1))
-        x,(h2,_) = self.lstm2(x, (h2, c2))
-        x,(h3, _) = self.lstm3(x, (h3, c3))
-        print(x.shape)
-        # x = x.squeeze()[-1,:,:]
-        x = x[-1,:,:]
-        x1 = self.sigmoid(self.fc1(x))
-        x2 = self.sigmoid(self.fc2(x))
-        return x1, x2
-    
-    def init_hidden(self, batch_size, hidden_dims, device):
-        (h1, c1) =  (torch.zeros(1, batch_size, hidden_dims[0], device=device).float(), torch.zeros(1, batch_size, hidden_dims[0], device=device).float())
-        (h2, c2) =  (torch.zeros(1, batch_size, hidden_dims[1], device=device).float(), torch.zeros(1, batch_size, hidden_dims[1], device=device).float())
-        (h3, c3) =  (torch.zeros(1, batch_size, hidden_dims[2], device=device).float(), torch.zeros(1, batch_size, hidden_dims[2], device=device).float())
-        return h1, h2, h3, c1, c2, c3
-    
+    def forward(self, input, hidden_state=None):
+        out = self.convlstm1(input)
+        # print(f'conv output: {out.shape}')
+        out = out.permute(0,2,1,3,4)
+        out = self.batch_norm1(out)
+        # print(f'bn output: {out.shape}')
+        out = self.maxpool(out)
+        # print(f'maxpool output: {out.shape}')
+        out = self.dropout(out)
+        # print(f'dropout output: {out.shape}')
+
+        out = out.permute(0,2,1,3,4)
+        # print(out.shape)
+        out = self.convlstm2(out)
+        # print(f'conv output: {out.shape}')
+        out = out.permute(0,2,1,3,4)
+        out = self.batch_norm2(out)
+        # print(f'bn output: {out.shape}')
+        out = self.maxpool(out)
+        # print(f'maxpool output: {out.shape}')
+        out = self.dropout(out)
+        # print(f'dropout output: {out.shape}')
+
+        out = out.permute(0,2,1,3,4)
+        out = self.convlstm3(out)
+        # print(f'conv output: {out.shape}')
+        out = out.permute(0,2,1,3,4)
+        out = self.batch_norm3(out)
+        # print(f'bn output: {out.shape}')
+        out = self.maxpool(out)
+        # print(f'maxpool output: {out.shape}')
+        out = self.dropout(out)
+        # print(f'dropout output: {out.shape}')
+
+        out = out.permute(0,2,1,3,4)
+        out = self.convlstm4(out)
+        # print(f'conv output: {out.shape}')
+        out = out.permute(0,2,1,3,4)
+        out = self.batch_norm4(out)
+        # print(f'bn output: {out.shape}')
+        out = self.maxpool(out)
+        # print(f'maxpool output: {out.shape}')
+        out = self.dropout(out)
+        # print(f'dropout output: {out.shape}')
+
+        out = self.conv3d(out)
+        # print(f'conv3d output: {out.shape}')
+        out = self.sigmoid(out)
+        return out
+
+
 if __name__ == '__main__':
 
-    model = CNNLSTM(n_input_channels=6, 
-                    batch_size=32, 
-                    embed_size=2304)
+    model = HotspotPredictor(input_dim=6, hidden_dim=64, kernel_size=3, bias=True)
     print(summary(model, 
                   torch.zeros(32,
                               16,
@@ -152,3 +159,12 @@ if __name__ == '__main__':
                               26,
                               26), 
                   show_input=True, show_hierarchical=True))
+        
+            
+
+
+
+
+
+
+

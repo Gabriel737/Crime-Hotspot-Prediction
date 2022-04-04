@@ -23,8 +23,7 @@ class FeatureDataset(Dataset):
         self.targets = self.read_h5(data_path = target_data_path, name = name)
         self.targets = self.reshape_targets(self.targets)
         self.bin_targets = self.get_binary_targets(self.targets)
-        self.tfm_targets = self.transform_targets(self.targets)
-        self.X, self.y, self.y_bin = self.numpy2tensor(self.features, self.tfm_targets, self.bin_targets)
+        self.X, self.y_bin = self.numpy2tensor(self.features, self.bin_targets)
         self.n_samples = self.targets.shape[0]
 
     def read_h5(self, data_path, name):
@@ -70,14 +69,6 @@ class FeatureDataset(Dataset):
         bin_targets = bin_flat.reshape(-1,total_bins)
         return bin_targets
 
-    def transform_targets(self, targets):
-        '''
-        Restrict continuous targets in 0-1 range 
-        '''
-        targets_log = np.where(targets>0, np.log(targets), 0)
-        max_log = np.max(targets_log)
-        return np.where(targets_log > 0, targets_log/max_log, 0)
-
     def __len__(self):
         '''
         Output : n_samples <int> : total samples in dataset
@@ -89,7 +80,7 @@ class FeatureDataset(Dataset):
         Input : idx <int> : data at index idx
         Output : X[idx], y[idx] <torch, torch> : feature and target tensors at index idx
         '''
-        return self.X[idx].float(), self.y[idx].float(), self.y_bin[idx].float()
+        return self.X[idx].float(), self.y_bin[idx].float()
     
 if __name__ == "__main__":
     name = 'train'
@@ -103,9 +94,9 @@ if __name__ == "__main__":
     
     data_loader = DataLoader(dataset=dataset, batch_size=config.TRAIN_BATCH_SIZE)
 
-    x, y, y_bin = next(iter(data_loader))
+    x, y_bin = next(iter(data_loader))
 
-    print(x.shape, y.shape, y_bin.shape)
+    print(x.shape, y_bin.shape)
 
 
 

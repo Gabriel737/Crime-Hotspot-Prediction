@@ -22,7 +22,7 @@ import data_loader
 #             bce_loss = bce_loss + loss(pred[:,i].view(-1,1),target[:,i].view(-1,1))
 #     return bce_loss
 
-def classification_loss(pred,target,weights=[0.5,1]):
+def classification_loss(pred,target,weights=[1,1.5]):
     input = torch.clamp(pred,min=1e-7,max=1-1e-7)
     bce = - weights[1] * target * torch.log(pred) - (1 - target) * weights[0] * torch.log(1 - pred)
     return torch.mean(bce)
