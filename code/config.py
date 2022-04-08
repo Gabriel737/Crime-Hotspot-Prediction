@@ -69,16 +69,16 @@ KERNEL_SIZE = 3
 DROP_P = 0.5
 
 # Learning rate
-LR = 1e-5
+LR = 3e-5
 
 # Save Model
 SAVE = True
 
 # No. of epochs
-N_EPOCHS = 100
+N_EPOCHS = 75
 
 # Classification threshold
-CLASS_THRESH = 0.4
+CLASS_THRESH = 0.45
 
 # Random seed
 RANDOM_SEED = 42
@@ -88,6 +88,12 @@ OPTIM_NAME = 'Adam'
 
 # Evaluate thresholds 
 EVAL_THRESHOLDS = [0.3, 0.4, 0.5 ,0.6, 0.7, 0.8]
+
+# No. of secondary features
+N_SEC_FEATS = 6
+
+# Cross entropy loss weights
+CROSS_ENT_LOSS_WEIGHTS = [1,3]
 
 
 

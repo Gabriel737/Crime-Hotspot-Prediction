@@ -9,7 +9,7 @@ import config
 
 class FeatureDataset(Dataset):
 
-    def __init__(self, feat_data_path, target_data_path, device, name):
+    def __init__(self, crime_feat_data_path, sec_feat_data_path, target_data_path, device, name):
         '''
         Initialise class variables
 
@@ -19,11 +19,13 @@ class FeatureDataset(Dataset):
                 name <str> : train/test
         '''
         self.device = device
-        self.features = self.read_h5(data_path = feat_data_path, name = name)
+        self.crime_features = self.read_h5(data_path = crime_feat_data_path, name = name)
+        self.sec_features = pd.read_csv(sec_feat_data_path,index_col=0).values
         self.targets = self.read_h5(data_path = target_data_path, name = name)
+
         self.targets = self.reshape_targets(self.targets)
         self.bin_targets = self.get_binary_targets(self.targets)
-        self.X, self.y_bin = self.numpy2tensor(self.features, self.bin_targets)
+        self.X_crime, self.X_sec, self.y_bin = self.numpy2tensor(self.crime_features, self.sec_features, self.bin_targets)
         self.n_samples = self.targets.shape[0]
 
     def read_h5(self, data_path, name):
@@ -32,7 +34,6 @@ class FeatureDataset(Dataset):
 
         Inputs: data_path <str> : path to data
                 name <str> : dataset name in h5 file
-        Output: arr <np.array> : numpy array
         '''
         hf = h5py.File(data_path, 'r')
         arr = np.array(hf[name][:])
@@ -43,7 +44,6 @@ class FeatureDataset(Dataset):
         Convert numpy arrays to tensors
 
         Input(s) : *args <np.array> : variable number of numpy arrays
-        Output : tensor_list <list(torch)> : list of converted tensors
         '''
         tensor_list = list()
         for a in args:
@@ -51,6 +51,11 @@ class FeatureDataset(Dataset):
         return tensor_list
     
     def reshape_targets(self, targets):
+        '''
+        Change shape of target array
+
+        Input - targets <no.array> : targets array to be reshaped
+        '''
         n_bins = int(config.BB_DIST/config.BB_CELL_LEN)
         total_bins = int(n_bins*n_bins)
         return  targets.reshape(-1,total_bins)
@@ -59,8 +64,7 @@ class FeatureDataset(Dataset):
         '''
         Convert targets array to binary values
 
-        Input : targets <np.array> : targets array
-        Output : bin_targets <np.array> : binary targets array
+        Input : targets <np.array> : targets array to be binarised
         '''
         flat = targets.reshape(-1,1)
         bin_flat = (flat>0).astype(int)
@@ -71,22 +75,26 @@ class FeatureDataset(Dataset):
 
     def __len__(self):
         '''
-        Output : n_samples <int> : total samples in dataset
+        Get number of samples in dataset
         '''
         return self.n_samples
 
     def __getitem__(self, idx):
         '''
-        Input : idx <int> : data at index idx
-        Output : X[idx], y[idx] <torch, torch> : feature and target tensors at index idx
+        Get batched inputs and binned targets
         '''
-        return self.X[idx].float(), self.y_bin[idx].float()
+        return self.X_crime[idx].float(), self.X_sec[idx].float(), self.y_bin[idx].float()
     
 if __name__ == "__main__":
+
     name = 'train'
-    feat_data_path = config.VAN_DATA_PRCD + '/features.h5'
+    crime_feat_data_path = config.VAN_DATA_PRCD + '/features.h5'
+    sec_feat_data_path = config.VAN_DATA_PRCD + '/cpi_hpi_weather_filtered_data.csv'
     target_data_path = config.VAN_DATA_PRCD + '/targets.h5'
-    dataset = FeatureDataset(feat_data_path=feat_data_path, 
+    
+
+    dataset = FeatureDataset(crime_feat_data_path=crime_feat_data_path,
+                            sec_feat_data_path=sec_feat_data_path,
                             target_data_path=target_data_path, 
                             device = torch.device(config.DEVICE),
                             name=name
@@ -94,9 +102,10 @@ if __name__ == "__main__":
     
     data_loader = DataLoader(dataset=dataset, batch_size=config.TRAIN_BATCH_SIZE)
 
-    x, y_bin = next(iter(data_loader))
+    x_crime, x_sec, y_bin = next(iter(data_loader))
 
-    print(x.shape, y_bin.shape)
+    print(x_crime.shape, x_sec.shape, y_bin.shape)
+    print(len(dataset))
 
 
 

@@ -1,5 +1,6 @@
 from turtle import hideturtle
 import numpy as np
+import config
 
 import torch
 import torch.nn as nn
@@ -10,8 +11,17 @@ from pytorch_model_summary import summary
 import config
 
 class ConvLSTMCell(nn.Module):
+    '''
+    Class for Convolution LSTM Cell
+    '''
 
     def __init__(self, input_dim, hidden_dim, kernel_size, bias):
+        '''
+        Inputs - input_dim <int> : number of input dimensions (channels)
+                 hidden_dim <int> : number of hidden dimensions (channels)
+                 kernel_size <int> : convolution kernel size
+                 bias <bool> : add bias or not
+        '''
         super(ConvLSTMCell,self).__init__()
 
         self.input_dim = input_dim
@@ -50,8 +60,17 @@ class ConvLSTMCell(nn.Module):
     
 
 class ConvLSTM(nn.Module):
+    '''
+    Class for Convoltion LSTM layer
+    '''
 
     def __init__(self, input_dim, hidden_dim, kernel_size, bias=True):
+        '''
+        Input : input_dim <int> : number of input dimensions (channels)
+                hidden_dim <int> : number of hidden dimensions (channels)
+                kernel_size <int> : convolution kernel size
+                bias <bool> : add bias or not
+        '''
         super(ConvLSTM, self).__init__()
 
         self.cell = ConvLSTMCell(input_dim=input_dim, hidden_dim=hidden_dim, kernel_size=kernel_size, bias=bias)
@@ -76,8 +95,17 @@ class ConvLSTM(nn.Module):
         return init_states
 
 class HotspotPredictor(nn.Module):
+    '''
+    Class for Crime Hostspot Prediction model
+    '''
     
     def __init__(self, input_dim, hidden_dim, kernel_size, bias=True):
+        '''
+        Inputs - input_dim <int> : number of input dimensions (channels)
+                 hidden_dim <int> : number of hidden dimensions (channels)
+                 kernel_size <int> : convolution kernel size
+                 bias <bool> : add bias or not
+        '''
         super(HotspotPredictor, self).__init__()
 
         self.convlstm1 = ConvLSTM(input_dim=input_dim, hidden_dim=hidden_dim, kernel_size=kernel_size, bias=bias)
@@ -96,69 +124,63 @@ class HotspotPredictor(nn.Module):
         self.dropout = nn.Dropout(p=config.DROP_P)
         self.sigmoid = nn.Sigmoid()
 
-        self.conv3d = nn.Conv3d(in_channels=hidden_dim,out_channels=1,kernel_size=(1,3,3),padding=(0,1,1),bias=True)
+        self.conv3d = nn.Conv3d(in_channels=hidden_dim,out_channels=3,kernel_size=(1,3,3),padding=(0,1,1),bias=True)
+
+        fc_input = int(3 * config.CELL_COUNT * config.CELL_COUNT) + config.N_SEC_FEATS
+        fc_out = int(config.CELL_COUNT * config.CELL_COUNT)
+        self.fc = nn.Linear(in_features=fc_input, out_features=fc_out)
     
-    def forward(self, input, hidden_state=None):
-        out = self.convlstm1(input)
-        # print(f'conv output: {out.shape}')
+    def forward(self, input_crime, input_sec, hidden_state=None):
+        out = self.convlstm1(input_crime)
         out = out.permute(0,2,1,3,4)
         out = self.batch_norm1(out)
-        # print(f'bn output: {out.shape}')
         out = self.maxpool(out)
-        # print(f'maxpool output: {out.shape}')
         out = self.dropout(out)
-        # print(f'dropout output: {out.shape}')
 
         out = out.permute(0,2,1,3,4)
-        # print(out.shape)
         out = self.convlstm2(out)
-        # print(f'conv output: {out.shape}')
         out = out.permute(0,2,1,3,4)
         out = self.batch_norm2(out)
-        # print(f'bn output: {out.shape}')
         out = self.maxpool(out)
-        # print(f'maxpool output: {out.shape}')
         out = self.dropout(out)
-        # print(f'dropout output: {out.shape}')
 
         out = out.permute(0,2,1,3,4)
         out = self.convlstm3(out)
-        # print(f'conv output: {out.shape}')
         out = out.permute(0,2,1,3,4)
         out = self.batch_norm3(out)
-        # print(f'bn output: {out.shape}')
         out = self.maxpool(out)
-        # print(f'maxpool output: {out.shape}')
         out = self.dropout(out)
-        # print(f'dropout output: {out.shape}')
 
         out = out.permute(0,2,1,3,4)
         out = self.convlstm4(out)
-        # print(f'conv output: {out.shape}')
         out = out.permute(0,2,1,3,4)
         out = self.batch_norm4(out)
-        # print(f'bn output: {out.shape}')
         out = self.maxpool(out)
-        # print(f'maxpool output: {out.shape}')
         out = self.dropout(out)
-        # print(f'dropout output: {out.shape}')
 
         out = self.conv3d(out)
-        # print(f'conv3d output: {out.shape}')
+        out = out.view(config.TRAIN_BATCH_SIZE,1,1,-1)
+        input_sec = input_sec.view(config.TRAIN_BATCH_SIZE,1,1,-1)
+        out = torch.cat((out,input_sec),axis=-1)
+        out = self.fc(out)
         out = self.sigmoid(out)
+        out = out.view(config.TRAIN_BATCH_SIZE,1,1,config.CELL_COUNT,config.CELL_COUNT)
+        # print(f'Output shape : {out.shape}')
         return out
 
 
 if __name__ == '__main__':
 
-    model = HotspotPredictor(input_dim=6, hidden_dim=64, kernel_size=3, bias=True)
-    print(summary(model, 
-                  torch.zeros(32,
-                              16,
-                              6,
-                              26,
-                              26), 
-                  show_input=True, show_hierarchical=True))
+    model = HotspotPredictor(input_dim=len(config.CRIME_CATS), hidden_dim=64, kernel_size=config.KERNEL_SIZE, bias=True)
+    print(model)
+
+    dummy_crime_input = torch.zeros(config.TRAIN_BATCH_SIZE, config.SEQ_LEN, len(config.CRIME_CATS), config.CELL_COUNT, config.CELL_COUNT)
+    dummy_crime_sec = torch.zeros(config.TRAIN_BATCH_SIZE, config.N_SEC_FEATS)
+    output = model(dummy_crime_input,dummy_crime_sec)
+    
+    n_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f'Total number of trainable parameters: {n_total_params}')
+
         
             
 
