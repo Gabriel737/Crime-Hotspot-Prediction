@@ -75,10 +75,10 @@ LR = 3e-5
 SAVE = True
 
 # No. of epochs
-N_EPOCHS = 75
+N_EPOCHS = 60
 
 # Classification threshold
-CLASS_THRESH = 0.45
+CLASS_THRESH = 0.5
 
 # Random seed
 RANDOM_SEED = 42

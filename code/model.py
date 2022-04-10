@@ -124,9 +124,9 @@ class HotspotPredictor(nn.Module):
         self.dropout = nn.Dropout(p=config.DROP_P)
         self.sigmoid = nn.Sigmoid()
 
-        self.conv3d = nn.Conv3d(in_channels=hidden_dim,out_channels=3,kernel_size=(1,3,3),padding=(0,1,1),bias=True)
+        self.conv3d = nn.Conv3d(in_channels=hidden_dim,out_channels=2,kernel_size=(1,3,3),padding=(0,1,1),bias=True)
 
-        fc_input = int(3 * config.CELL_COUNT * config.CELL_COUNT) + config.N_SEC_FEATS
+        fc_input = int(2 * config.CELL_COUNT * config.CELL_COUNT) + config.N_SEC_FEATS
         fc_out = int(config.CELL_COUNT * config.CELL_COUNT)
         self.fc = nn.Linear(in_features=fc_input, out_features=fc_out)
     

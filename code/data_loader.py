@@ -20,7 +20,7 @@ class FeatureDataset(Dataset):
         '''
         self.device = device
         self.crime_features = self.read_h5(data_path = crime_feat_data_path, name = name)
-        self.sec_features = pd.read_csv(sec_feat_data_path,index_col=0).values
+        self.sec_features = self.read_h5(data_path = sec_feat_data_path, name = name)
         self.targets = self.read_h5(data_path = target_data_path, name = name)
 
         self.targets = self.reshape_targets(self.targets)
@@ -89,7 +89,7 @@ if __name__ == "__main__":
 
     name = 'train'
     crime_feat_data_path = config.VAN_DATA_PRCD + '/features.h5'
-    sec_feat_data_path = config.VAN_DATA_PRCD + '/cpi_hpi_weather_filtered_data.csv'
+    sec_feat_data_path = config.VAN_DATA_PRCD + '/sec_features.h5'
     target_data_path = config.VAN_DATA_PRCD + '/targets.h5'
     
 

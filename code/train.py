@@ -13,7 +13,7 @@ import config
 from model import HotspotPredictor
 from loss import classification_loss
 
-def validate(dl, model, batch_size, epoch ,best_f1, best_model, writer):
+def validate(dl, model, batch_size, epoch ,best_f1, best_model, best_epoch, writer):
     '''
     Validation loop
 
@@ -23,7 +23,7 @@ def validate(dl, model, batch_size, epoch ,best_f1, best_model, writer):
              epoch: current epoch number
              best_recall: current best recall score
              best model: current best model
-             writer: tensboard summary writer
+             writer: tensorboard summary writer
     '''
 
     model.eval()
@@ -65,17 +65,19 @@ def validate(dl, model, batch_size, epoch ,best_f1, best_model, writer):
         if epoch == 0:
             best_model = model
             best_f1 = f1score
+            best_epoch = 0
         else:
             if f1score > best_f1:
                 best_f1 = f1score
                 best_model = model
+                best_epoch = epoch
 
         avg_loss = epoch_loss/total
 
     print(f'Validation Recall Score: {recall}')
     print(f'Validation Precision Score: {precision}')
 
-    return best_model, best_f1, f1score, recall, precision, avg_loss
+    return best_model, best_f1, best_epoch, f1score, recall, precision, avg_loss
 
 
 def test(dl, model, batch_size):
@@ -143,11 +145,12 @@ def train(train_dl, val_dl, model, optim, epochs, batch_size, save, start_epoch=
              model_save_path: path to save trained model
     '''
     optim_name = type(optim).__name__
-    model_name = model.__class__.__name__
+    # model_name = model.__class__.__name__
     writer = SummaryWriter(comment='-optim-({})_lr-({})_bs-({})_thres-({})_rs-({})-nepoch-({})_wcew-({})'
                                 .format(optim_name, config.LR, config.TRAIN_BATCH_SIZE, 
                                         config.CLASS_THRESH, config.RANDOM_SEED, config.N_EPOCHS, config.CROSS_ENT_LOSS_WEIGHTS))
     best_model = model
+    best_epoch = 0
     best_f1 = 0.0
 
     for epoch in range(start_epoch,epochs):
@@ -188,7 +191,7 @@ def train(train_dl, val_dl, model, optim, epochs, batch_size, save, start_epoch=
         print(f'Train Precision Score: {precision}')
         print(f'Train Loss: {avg_loss}')
 
-        best_model, best_f1, val_f1, val_recall, val_precision, val_avg_loss = validate(val_dl, model, batch_size, epoch, best_f1, best_model, writer)
+        best_model, best_f1, best_epoch, val_f1, val_recall, val_precision, val_avg_loss = validate(val_dl, model, batch_size, epoch, best_f1, best_model, best_epoch, writer)
 
         writer.add_scalar('Loss/Train', avg_loss, epoch)
         writer.add_scalar('Loss/Val', val_avg_loss, epoch)
@@ -210,7 +213,7 @@ def train(train_dl, val_dl, model, optim, epochs, batch_size, save, start_epoch=
             torch.save(checkpoint,model_save_path+f'/model_checkpoint_optim-({optim_name})_lr-({config.LR})_bs-({config.TRAIN_BATCH_SIZE})_thres-({config.CLASS_THRESH})_rs-({config.RANDOM_SEED})-nepoch-({config.N_EPOCHS})_wcew-({config.CROSS_ENT_LOSS_WEIGHTS}).pt')
     writer.close()
 
-    return best_model, best_f1
+    return best_model, best_f1, best_epoch
 
 
 if __name__ == '__main__':
@@ -222,19 +225,19 @@ if __name__ == '__main__':
     device = torch.device(config.DEVICE)
 
     train_data = FeatureDataset(crime_feat_data_path=config.VAN_DATA_PRCD+'/features.h5',
-                                sec_feat_data_path=config.VAN_DATA_PRCD+'/cpi_hpi_weather_filtered_data.csv',
+                                sec_feat_data_path=config.VAN_DATA_PRCD+'/sec_features.h5',
                                 target_data_path=config.VAN_DATA_PRCD+'/targets.h5',
                                 device=device,
                                 name = 'train')
     
     val_data = FeatureDataset(crime_feat_data_path=config.VAN_DATA_PRCD+'/features.h5',
-                                sec_feat_data_path=config.VAN_DATA_PRCD+'/cpi_hpi_weather_filtered_data.csv',
+                                sec_feat_data_path=config.VAN_DATA_PRCD+'/sec_features.h5',
                                 target_data_path=config.VAN_DATA_PRCD+'/targets.h5',
                                 device=device,
                                 name = 'val')
 
     test_data = FeatureDataset(crime_feat_data_path=config.VAN_DATA_PRCD+'/features.h5',
-                                sec_feat_data_path=config.VAN_DATA_PRCD+'/cpi_hpi_weather_filtered_data.csv',
+                                sec_feat_data_path=config.VAN_DATA_PRCD+'/sec_features.h5',
                                 target_data_path=config.VAN_DATA_PRCD+'/targets.h5',
                                 device=device,
                                 name = 'test')
@@ -273,20 +276,22 @@ if __name__ == '__main__':
 
     print('\n Training Starts \n')
 
-    best_model, best_f1 = train(train_dl=train_loader,
-                                val_dl=val_loader,
-                                model=model,
-                                optim=optim,
-                                epochs=config.N_EPOCHS,
-                                batch_size=config.TRAIN_BATCH_SIZE,
-                                save=save,
-                                start_epoch=start_epoch,
-                                model_save_path=model_save_path)
-    
+    best_model, best_f1, best_epoch = train(train_dl=train_loader,
+                                            val_dl=val_loader,
+                                            model=model,
+                                            optim=optim,
+                                            epochs=config.N_EPOCHS,
+                                            batch_size=config.TRAIN_BATCH_SIZE,
+                                            save=save,
+                                            start_epoch=start_epoch,
+                                            model_save_path=model_save_path)
+                
     test_loss, _ ,test_recall, _ = test(dl=test_loader, model=best_model, batch_size=config.TRAIN_BATCH_SIZE)
 
-    print('Saving best model')
-    final_checkpoint = {'model':best_model.state_dict()}
+    print('\n Saving best model \n')
+    print(f'Best model saved at {best_epoch} epoch')
+
+    final_checkpoint = {'model':best_model.state_dict(), 'epoch':best_epoch}
     torch.save(final_checkpoint,model_save_path+f'/best_model_optim-({optim_name})_lr-({config.LR})_bs-({config.TRAIN_BATCH_SIZE})_thres-({config.CLASS_THRESH})_rs-({config.RANDOM_SEED})-nepoch-({config.N_EPOCHS})_wcew-({config.CROSS_ENT_LOSS_WEIGHTS}.pt')
 
     end_time = time.time()
