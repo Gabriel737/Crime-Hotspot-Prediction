@@ -19,11 +19,11 @@ Install the required dependencies:
 
 ``` pip install requirements.txt ```
 
-Go to app folder and run the streamlit application 
+Go to app folder and run: 
 
 ``` streamlit run main.py ```
 
-This will run the streamlit web application on localhost
+This will run the streamlit web application on localhost.
 
 
 ## Model Training and Testing
