@@ -15,6 +15,18 @@ This project aims to identify areas and neighbouthoods with elevated crime risk 
 
 ## Demo
 
+Install the required dependencies:
+
+``` pip install requirements.txt ```
+
+Go to folder where application's main.py is present
+
+Run the streamlit application 
+``` streamlit run main.py ```
+
+This will run the streamlit web application on localhost
+
+
 ## Model Training and Testing
 
 Install the required dependencies:
