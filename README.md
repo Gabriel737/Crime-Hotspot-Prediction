@@ -19,7 +19,7 @@ Install the required dependencies:
 
 ``` pip install requirements.txt ```
 
-Go to code folder and run the streamlit application 
+Go to app folder and run the streamlit application 
 
 ``` streamlit run main.py ```
 
