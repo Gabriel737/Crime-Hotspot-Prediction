@@ -251,7 +251,6 @@ class Prediction(HydraHeadApp):
                
                
                m = folium.Map(location=[(min_lat+max_lat)/2, (min_long+max_long)/2],zoom_start=6,tiles='OpenStreetMap') #Create a empty folium map object
-               # m.save('map1.html')
                m.fit_bounds([[min_lat,min_long], [max_lat,max_long]])
                folium.Rectangle(bounds=[(min_lat,min_long),(max_lat,max_long)], color='yellow', fill=True, fill_color='#ffffff', fill_opacity=0.1).add_to(m)
                

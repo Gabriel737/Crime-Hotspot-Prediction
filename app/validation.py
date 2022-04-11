@@ -419,9 +419,6 @@ class Validation(HydraHeadApp):
                 m = add_categorical_legend(m, 'My title',
                              colors = ['#000','#03cafc'],
                            labels = ['Heat', 'Cold'])
-                m.save('map.html')
-                
-
                 folium_static(m,width=520,height=380,)
                 
 
