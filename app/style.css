@@ -1,0 +1,35 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Apr  8 18:01:07 2022
+
+@author: arshdeepsingh
+"""
+
+.highlight {
+  border-radius: 0.4rem;
+  color: white;
+  padding: 0.5rem;
+}
+.bold {
+  padding-left: 1rem;
+  font-weight: 700;
+}
+.blue {
+  background-color: lightcoral;
+  padding-right: .6rem;
+  padding-top: .4rem;
+  padding-bottom: .4rem;
+}
+.red {
+  background-color: lightblue;
+  padding-right: .6rem;
+  padding-top: .4rem;
+  padding-bottom: .4rem;
+}
+.green {
+  background-color: lightgreen;
+  padding-right: .6rem;
+  padding-top: .4rem;
+  padding-bottom: .4rem;
+  }
