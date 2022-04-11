@@ -6,7 +6,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.modules import padding
-from pytorch_model_summary import summary
 
 import config
 
@@ -126,7 +125,9 @@ class HotspotPredictor(nn.Module):
 
         self.conv3d = nn.Conv3d(in_channels=hidden_dim,out_channels=2,kernel_size=(1,3,3),padding=(0,1,1),bias=True)
 
-        fc_input = int(2 * config.CELL_COUNT * config.CELL_COUNT) + config.N_SEC_FEATS
+        self.fc_input1 = int(2 * config.CELL_COUNT * config.CELL_COUNT)
+        self.fc_input2 = config.N_SEC_FEATS
+        fc_input = self.fc_input1 + self.fc_input2
         fc_out = int(config.CELL_COUNT * config.CELL_COUNT)
         self.fc = nn.Linear(in_features=fc_input, out_features=fc_out)
     
@@ -159,12 +160,15 @@ class HotspotPredictor(nn.Module):
         out = self.dropout(out)
 
         out = self.conv3d(out)
-        out = out.view(config.TRAIN_BATCH_SIZE,1,1,-1)
-        input_sec = input_sec.view(config.TRAIN_BATCH_SIZE,1,1,-1)
+        # out = out.view(config.TRAIN_BATCH_SIZE,1,1,-1)
+        out = out.view(-1,1,1,self.fc_input1)
+        # input_sec = input_sec.view(config.TRAIN_BATCH_SIZE,1,1,-1)
+        input_sec = input_sec.view(-1,1,1,config.N_SEC_FEATS)
+        print(input_sec.shape)
         out = torch.cat((out,input_sec),axis=-1)
         out = self.fc(out)
         out = self.sigmoid(out)
-        out = out.view(config.TRAIN_BATCH_SIZE,1,1,config.CELL_COUNT,config.CELL_COUNT)
+        out = out.view(-1,1,1,config.CELL_COUNT,config.CELL_COUNT)
         # print(f'Output shape : {out.shape}')
         return out
 
