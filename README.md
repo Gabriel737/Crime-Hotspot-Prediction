@@ -1,7 +1,7 @@
 # Crime-Hotspot-Prediction
 
 ## Project Objective
-This project aims to identify areas and neighbouthoods with elevated crime risk in major Canadian cities (Vancouver and Toronto) using a spatio-temporal neural network. 
+This project aims to identify areas and neighbouthoods with elevated crime risk in major Canadian cities (currently Vancouver) using a spatio-temporal neural network. 
 
 ## Datasets Used
 * Vancouver Police Department Open Data on crime incidents ([source](https://geodash.vpd.ca/opendata/))
