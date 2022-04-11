@@ -12,3 +12,7 @@ This project aims to identify areas and neighbouthoods with elevated crime risk 
 
 ## Pipeline
 ![pipeline](https://user-images.githubusercontent.com/63226332/157356389-2adfaec3-56b9-461b-9440-e9c8673f957f.jpeg)
+
+## Streamlit Dashboard
+![WhatsApp Image 2022-04-10 at 10 30 56 PM](https://user-images.githubusercontent.com/26691915/162671625-5cc9d3a2-7ad4-4064-85bd-9859c03481a1.jpeg)
+
