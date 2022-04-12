@@ -1,9 +1,9 @@
 # Crime-Hotspot-Prediction
 
-![WhatsApp Image 2022-04-10 at 10 30 56 PM](https://user-images.githubusercontent.com/26691915/162671625-5cc9d3a2-7ad4-4064-85bd-9859c03481a1.jpeg)
-
 ## Project Objective
 This project aims to identify areas and neighbouthoods with elevated crime risk in major Canadian cities (presently Vancouver) using a spatial-temporal neural network architecture. 
+
+![WhatsApp Image 2022-04-10 at 10 30 56 PM](https://user-images.githubusercontent.com/26691915/162671625-5cc9d3a2-7ad4-4064-85bd-9859c03481a1.jpeg)
 
 ## Datasets Used
 * Vancouver Police Department Open Data on crime incidents ([source](https://geodash.vpd.ca/opendata/))
